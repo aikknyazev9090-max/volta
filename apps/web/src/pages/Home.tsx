@@ -1,16 +1,18 @@
+import clsx from 'clsx';
 import { motion } from 'framer-motion';
-import { ChevronRight, Gift, GraduationCap, Trophy, X } from 'lucide-react';
+import { ChevronRight, Cpu, Gift, Globe2, GraduationCap, Trophy, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Header, SportChips } from '../components/Chrome';
-import { Coin } from '../components/icons';
+import { Header } from '../components/Chrome';
+import { Coin, Flag } from '../components/icons';
 import { groupByLeague, LeagueGroup, MatchListSkeleton } from '../components/MatchCard';
 import { TopMatchCard } from '../components/TopMatchCard';
-import { ErrorState, LiveDot, SectionTitle, Segmented, Skeleton } from '../components/ui';
+import { ErrorState, SectionTitle, Skeleton } from '../components/ui';
 import { coins, dayLabel } from '../lib/format';
-import { useEventList, useMe, useSportCounts } from '../lib/queries';
+import { useEventList, useMe } from '../lib/queries';
+import { haptic } from '../lib/tg';
 import { useEventsStore, useUi } from '../store';
-import type { EventSummary, SportId } from '../types';
+import type { EventSummary } from '../types';
 
 /** Карточка «Как сделать ставку» для новичков; можно скрыть. */
 function HowTo() {
@@ -54,6 +56,31 @@ function HowTo() {
   );
 }
 
+/** Пояснение к реальным матчам. */
+function RealInfo() {
+  return (
+    <div className="card mx-3 flex gap-3 p-3.5">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent/15 text-accent">
+        <Globe2 size={18} strokeWidth={2.3} />
+      </span>
+      <div className="text-[12.5px] leading-snug text-muted">
+        <div className="text-[13.5px] font-extrabold text-ink">Настоящие матчи топ-лиг Европы</div>
+        Ставки — до стартового свистка. Расчёт по итоговому счёту, он приходит с задержкой до часа. Коэффициенты считает наша модель по рейтингу силы клубов.
+      </div>
+    </div>
+  );
+}
+
+function groupByDay(list: EventSummary[]) {
+  const m = new Map<string, EventSummary[]>();
+  for (const e of list) {
+    const d = e.status === 'live' ? 'Идут сейчас' : dayLabel(e.startAt);
+    if (!m.has(d)) m.set(d, []);
+    m.get(d)!.push(e);
+  }
+  return [...m.entries()];
+}
+
 function PromoBonus() {
   const { data: me } = useMe();
   const open = useUi((s) => s.setBonusOpen);
@@ -80,43 +107,99 @@ function useStoreList(data: EventSummary[] | undefined) {
   return useMemo(() => (data ?? []).map((e) => byId[e.id] ?? e).filter((e) => e.status === 'live' || e.status === 'scheduled'), [data, byId]);
 }
 
+/** Короткие названия турниров для фильтра. */
+const SHORT_LEAGUE: Record<string, string> = {
+  'real-CL': 'Лига чемпионов',
+  'real-PL': 'АПЛ',
+  'real-PD': 'Ла Лига',
+  'real-SA': 'Серия A',
+  'real-BL1': 'Бундеслига',
+  'real-FL1': 'Лига 1',
+  'real-DED': 'Эредивизи',
+  'real-PPL': 'Португалия',
+};
+const ORDER = Object.keys(SHORT_LEAGUE);
+
+function LeagueChips({ list, value, onChange }: { list: EventSummary[]; value: string | null; onChange: (id: string | null) => void }) {
+  const leagues = useMemo(() => {
+    const m = new Map<string, { league: EventSummary['league']; n: number }>();
+    for (const e of list) {
+      const x = m.get(e.league.id) ?? { league: e.league, n: 0 };
+      x.n++;
+      m.set(e.league.id, x);
+    }
+    return [...m.values()].sort((a, b) => ORDER.indexOf(a.league.id) - ORDER.indexOf(b.league.id));
+  }, [list]);
+  if (leagues.length < 2) return null;
+  const chip = (id: string | null, label: React.ReactNode, n: number) => {
+    const active = value === id;
+    return (
+      <button
+        key={id ?? 'all'}
+        onClick={() => {
+          haptic.select();
+          onChange(id);
+        }}
+        className={clsx('press flex h-[38px] shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-bold transition-colors', active ? 'border-transparent bg-ink text-bg' : 'border-line bg-surface text-ink/85')}
+      >
+        {label}
+        <span className={clsx('num text-[11.5px] font-extrabold', active ? 'text-bg/55' : 'text-faint')}>{n}</span>
+      </button>
+    );
+  };
+  return (
+    <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 lg:flex-wrap">
+      {chip(null, 'Все', list.length)}
+      {leagues.map(({ league, n }) =>
+        chip(
+          league.id,
+          <>
+            <Flag code={league.country} />
+            {SHORT_LEAGUE[league.id] ?? league.name}
+          </>,
+          n,
+        ),
+      )}
+    </div>
+  );
+}
+
+/** Ссылка на раздел виртуальных матчей. */
+function VirtualLink() {
+  return (
+    <Link to="/virtual" className="press mx-4 mt-4 flex items-center gap-3 rounded-[18px] border border-line bg-surface px-4 py-3">
+      <span className="grid h-9 w-9 place-items-center rounded-xl bg-surface2 text-muted">
+        <Cpu size={18} strokeWidth={2.3} />
+      </span>
+      <span className="flex-1">
+        <span className="block text-[14px] font-extrabold">Виртуальные матчи</span>
+        <span className="text-[12px] text-muted">Матчи разыгрывает компьютер — круглосуточно, с лайвом</span>
+      </span>
+      <ChevronRight size={18} className="text-faint" />
+    </Link>
+  );
+}
+
 export default function Home() {
-  // вид спорта хранится в адресе (?sport=football): так его можно выбрать и из левого меню на компьютере
+  // турнир хранится в адресе (?league=real-PL): так его можно выбрать и из левого меню на компьютере
   const [params, setParams] = useSearchParams();
-  const sport = (params.get('sport') as SportId | null) || null;
-  const setSport = (s: SportId | null) => {
+  const league = params.get('league');
+  const setLeague = (id: string | null) => {
     const p = new URLSearchParams(params);
-    if (s) p.set('sport', s);
-    else p.delete('sport');
+    if (id) p.set('league', id);
+    else p.delete('league');
     setParams(p, { replace: true });
   };
-  const [tab, setTab] = useState<'live' | 'upcoming'>('live');
   const all = useEventList('all');
-  const counts = useSportCounts();
   const list = useStoreList(all.data);
-
-  const filtered = useMemo(() => (sport ? list.filter((e) => e.sport === sport) : list), [list, sport]);
+  const real = useMemo(() => list.filter((e) => e.real), [list]);
+  const filtered = useMemo(() => (league ? real.filter((e) => e.league.id === league) : real), [real, league]);
+  const sorted = useMemo(() => [...filtered].sort((a, b) => (a.status === b.status ? a.startAt - b.startAt : a.status === 'live' ? -1 : 1)), [filtered]);
+  const byDay = useMemo(() => groupByDay(sorted), [sorted]);
   const top = useMemo(() => {
-    // в топе — равные по силе матчи: без «решённых» коэффициентов вроде 1.01
     const balanced = (e: EventSummary) => Math.min(...e.main!.outcomes.map((o) => o.odds ?? 1)) >= 1.25;
-    const t = filtered.filter((e) => e.top && e.main && balanced(e));
-    const live = t.filter((e) => e.status === 'live');
-    const soon = t.filter((e) => e.status === 'scheduled').sort((a, b) => a.startAt - b.startAt);
-    return [...live, ...soon].slice(0, 8);
-  }, [filtered]);
-  const live = filtered.filter((e) => e.status === 'live');
-  const upcoming = filtered.filter((e) => e.status === 'scheduled').sort((a, b) => a.startAt - b.startAt);
-
-  // предстоящие — по дням, внутри по лигам
-  const byDay = useMemo(() => {
-    const m = new Map<string, EventSummary[]>();
-    for (const e of upcoming.slice(0, 60)) {
-      const d = dayLabel(e.startAt);
-      if (!m.has(d)) m.set(d, []);
-      m.get(d)!.push(e);
-    }
-    return [...m.entries()];
-  }, [upcoming]);
+    return sorted.filter((e) => e.status === 'scheduled' && e.top && e.main && balanced(e)).slice(0, 8);
+  }, [sorted]);
 
   return (
     <div className="pb-6">
@@ -125,30 +208,56 @@ export default function Home() {
         <PromoBonus />
         <HowTo />
 
-        <SectionTitle className="mt-5" action={<span className="text-[12px] font-bold text-faint">{top.length ? `${top.length} матчей` : ''}</span>}>
-          Топ-матчи
-        </SectionTitle>
-        {all.isLoading ? (
-          <div className="mt-3 flex gap-3 overflow-hidden px-4">
-            <Skeleton className="h-[218px] w-[84%] shrink-0 rounded-[22px]" />
-            <Skeleton className="h-[218px] w-[84%] shrink-0 rounded-[22px]" />
-          </div>
-        ) : top.length ? (
-          <div className="no-scrollbar mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 pb-1 lg:grid lg:grid-cols-2 lg:overflow-visible lg:[&>*:nth-child(n+5)]:hidden">
-            {top.map((e, i) => (
-              <TopMatchCard key={e.id} id={e.id} index={i} />
-            ))}
-          </div>
-        ) : (
-          <div className="mx-4 mt-3 rounded-2xl border border-dashed border-line py-6 text-center text-[13px] text-muted">Топ-матчей по этому виду спорта пока нет</div>
+        {(all.isLoading || top.length > 0) && (
+          <>
+            <SectionTitle className="mt-5" action={<span className="text-[12px] font-bold text-faint">{top.length ? `${top.length} матчей` : ''}</span>}>
+              Главные матчи
+            </SectionTitle>
+            {all.isLoading ? (
+              <div className="mt-3 flex gap-3 overflow-hidden px-4">
+                <Skeleton className="h-[218px] w-[84%] shrink-0 rounded-[22px]" />
+                <Skeleton className="h-[218px] w-[84%] shrink-0 rounded-[22px]" />
+              </div>
+            ) : (
+              <div className="no-scrollbar mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 pb-1 lg:grid lg:grid-cols-2 lg:overflow-visible lg:[&>*:nth-child(n+5)]:hidden">
+                {top.map((e, i) => (
+                  <TopMatchCard key={e.id} id={e.id} index={i} />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       <div className="mt-5">
-        <SportChips value={sport} onChange={setSport} counts={counts.data} mode="all" />
+        <LeagueChips list={real} value={league} onChange={setLeague} />
       </div>
 
-      <Link to="/leaderboard" className="press mx-4 mt-4 flex items-center gap-3 rounded-[18px] border border-line bg-surface px-4 py-3">
+      <div className="mt-3 space-y-3">
+        <RealInfo />
+        {all.isError ? (
+          <ErrorState onRetry={() => all.refetch()} />
+        ) : all.isLoading ? (
+          <MatchListSkeleton />
+        ) : sorted.length ? (
+          byDay.map(([day, evs]) => (
+            <div key={day} className="space-y-3">
+              <div className="px-4 pt-1 text-[12px] font-extrabold uppercase tracking-wider text-faint">{day}</div>
+              {groupByLeague(evs).map((g, i) => (
+                <LeagueGroup key={g.league.id + day} {...g} index={i} />
+              ))}
+            </div>
+          ))
+        ) : (
+          <div className="mx-4 rounded-2xl border border-dashed border-line px-6 py-8 text-center text-[13px] text-muted">
+            Расписание обновляется. Пока ближайших матчей нет — загляните в виртуальные матчи.
+          </div>
+        )}
+      </div>
+
+      <VirtualLink />
+
+      <Link to="/leaderboard" className="press mx-4 mt-3 flex items-center gap-3 rounded-[18px] border border-line bg-surface px-4 py-3">
         <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent/15 text-accent">
           <Trophy size={18} strokeWidth={2.3} />
         </span>
@@ -158,47 +267,6 @@ export default function Home() {
         </span>
         <ChevronRight size={18} className="text-faint" />
       </Link>
-
-      <div className="mt-5 px-4">
-        <Segmented
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'live', label: <><LiveDot className="!h-1.5 !w-1.5" /> Лайв <span className="num text-faint">{live.length}</span></> },
-            { value: 'upcoming', label: <>Скоро <span className="num text-faint">{upcoming.length}</span></> },
-          ]}
-        />
-      </div>
-
-      <div className="mt-3 space-y-3">
-        {all.isError ? (
-          <ErrorState onRetry={() => all.refetch()} />
-        ) : all.isLoading ? (
-          <MatchListSkeleton />
-        ) : tab === 'live' ? (
-          live.length ? (
-            <>
-              {groupByLeague(live).slice(0, 6).map((g, i) => (
-                <LeagueGroup key={g.league.id} {...g} index={i} />
-              ))}
-              <Link to="/live" className="press mx-3 flex h-11 items-center justify-center gap-1 rounded-2xl bg-surface2 text-[13.5px] font-bold">
-                Весь лайв <ChevronRight size={16} />
-              </Link>
-            </>
-          ) : (
-            <div className="mx-4 rounded-2xl border border-dashed border-line py-8 text-center text-[13px] text-muted">Сейчас нет матчей в лайве — загляните во вкладку «Скоро»</div>
-          )
-        ) : (
-          byDay.map(([day, evs]) => (
-            <div key={day} className="space-y-3">
-              <div className="px-4 pt-1 text-[12px] font-extrabold uppercase tracking-wider text-faint">{day}</div>
-              {groupByLeague(evs).map((g, i) => (
-                <LeagueGroup key={g.league.id + day} {...g} index={i} />
-              ))}
-            </div>
-          ))
-        )}
-      </div>
     </div>
   );
 }

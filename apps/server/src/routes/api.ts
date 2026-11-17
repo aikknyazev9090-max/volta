@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { devUser, verifyInitData } from '../auth.js';
 import { env, getSettings } from '../config.js';
 import { q } from '../db.js';
-import { events, full, isSuspended, summary } from '../engine/live.js';
+import { events, full, isSuspended, summary, isReal } from '../engine/live.js';
 import { SPORTS, SPORT_ORDER } from '../sports/index.js';
 import { listAchievements } from '../services/achievements.js';
 import { cashout, cashoutQuote, listBets, placeBets } from '../services/bets.js';
@@ -129,6 +129,7 @@ export async function apiRoutes(app: FastifyInstance) {
     const res: Record<string, { live: number; upcoming: number }> = {};
     for (const id of SPORT_ORDER) res[id] = { live: 0, upcoming: 0 };
     for (const ev of events.values()) {
+      if (isReal(ev)) continue;
       if (ev.status === 'live') res[ev.sport].live++;
       else if (ev.status === 'scheduled') res[ev.sport].upcoming++;
     }

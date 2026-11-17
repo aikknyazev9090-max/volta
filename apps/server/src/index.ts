@@ -9,6 +9,7 @@ import { startBackups } from './backup.js';
 import { botUsername, handleWebhookUpdate, startBot, webhookSecret } from './bot.js';
 import { env } from './config.js';
 import { setFinishHandler, startEngine } from './engine/live.js';
+import { startRealMatches } from './real/footballData.js';
 import { adminRoutes } from './routes/admin.js';
 import { apiRoutes } from './routes/api.js';
 import { settleEvent } from './services/bets.js';
@@ -70,6 +71,7 @@ if (existsSync(webDist)) {
 
 setFinishHandler((ev) => settleEvent(ev));
 startEngine();
+startRealMatches();
 
 await app.listen({ port: env.port, host: '0.0.0.0' });
 console.log(`[api] http://localhost:${env.port}  (лайв ×${env.liveSpeed}, dev-вход: ${env.devAuth ? 'вкл' : 'выкл'})`);

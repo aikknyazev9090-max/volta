@@ -1,15 +1,15 @@
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Gift, HelpCircle, Home, Radio, Search, Ticket, Trophy, User } from 'lucide-react';
+import { Cpu, Gift, HelpCircle, Home, Search, Ticket, Trophy, User } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEventList, useMe, useSportCounts } from '../lib/queries';
 import { haptic } from '../lib/tg';
 import { useEvent, useSlip, useUi } from '../store';
-import { Coin, Logo, SportIcon, Wordmark } from './icons';
+import { Coin, Flag, Logo, SportIcon, Wordmark } from './icons';
 import { AnimatedNumber } from './ui';
 import { SPORT_NAMES, SPORT_ORDER } from '../lib/format';
-import type { SportId } from '../types';
+import type { EventSummary, SportId } from '../types';
 
 export function BalancePill() {
   const { data } = useMe();
@@ -76,7 +76,7 @@ export function Header({ title, right, sub }: { title?: ReactNode; right?: React
 
 const NAV = [
   { to: '/', label: 'Главная', icon: Home },
-  { to: '/live', label: 'Лайв', icon: Radio },
+  { to: '/virtual', label: 'Виртуальные', icon: Cpu },
   { to: '#slip', label: 'Купон', icon: Ticket },
   { to: '/bets', label: 'Ставки', icon: Ticket },
   { to: '/profile', label: 'Профиль', icon: User },
@@ -122,7 +122,7 @@ export function BottomNav() {
           return (
             <NavLink key={n.to} to={n.to} onClick={() => haptic.select()} className="relative flex h-full flex-col items-center justify-center gap-1">
               {active && <motion.span layoutId="nav-dot" className="absolute top-0 h-[3px] w-8 rounded-b-full bg-accent" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
-              {n.to === '/live' ? (
+              {n.to === '/virtual' ? (
                 <span className="relative">
                   <Icon size={22} strokeWidth={active ? 2.4 : 2} className={active ? 'text-ink' : 'text-muted'} />
                   <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full border-2 border-bg bg-live" />
@@ -182,7 +182,7 @@ export function useIsDesktop() {
 
 const SIDE = [
   { to: '/', label: 'Главная', icon: Home },
-  { to: '/live', label: 'Лайв', icon: Radio },
+  { to: '/virtual', label: 'Виртуальные матчи', icon: Cpu },
   { to: '/bets', label: 'Мои ставки', icon: Ticket },
   { to: '/leaderboard', label: 'Рейтинг', icon: Trophy },
   { to: '/profile', label: 'Профиль', icon: User },
@@ -206,7 +206,7 @@ export function SideNav() {
           <NavLink key={n.to} to={n.to} className={clsx('flex h-11 items-center gap-3 rounded-xl px-3 text-[14.5px] font-bold transition-colors', active ? 'bg-surface2 text-ink' : 'text-muted hover:bg-surface hover:text-ink')}>
             <span className="relative">
               <Icon size={20} strokeWidth={active ? 2.4 : 2} className={active ? 'text-accent' : ''} />
-              {n.to === '/live' && <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full border-2 border-bg bg-live" />}
+              {n.to === '/virtual' && <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full border-2 border-bg bg-live" />}
             </span>
             {n.label}
           </NavLink>
@@ -242,39 +242,42 @@ function MiniLive({ id }: { id: string }) {
   );
 }
 
-/** Нижняя часть левого меню: виды спорта и пара матчей в лайве. */
+const LEAGUE_ORDER = ['real-CL', 'real-PL', 'real-PD', 'real-SA', 'real-BL1', 'real-FL1', 'real-DED', 'real-PPL'];
+
+/** Нижняя часть левого меню: турниры с реальными матчами и пара виртуальных матчей в лайве. */
 function SideExtras() {
-  const counts = useSportCounts();
-  const live = useEventList('live');
+  const all = useEventList('all');
   const loc = useLocation();
-  const cur = loc.pathname === '/' ? new URLSearchParams(loc.search).get('sport') : null;
-  const liveIds = (live.data ?? []).slice(0, 3).map((e) => e.id);
+  const cur = loc.pathname === '/' ? new URLSearchParams(loc.search).get('league') : null;
+  const list = all.data ?? [];
+  const leagues = new Map<string, { league: EventSummary['league']; n: number }>();
+  for (const e of list) {
+    if (!e.real || e.status !== 'scheduled') continue;
+    const x = leagues.get(e.league.id) ?? { league: e.league, n: 0 };
+    x.n++;
+    leagues.set(e.league.id, x);
+  }
+  const liveIds = list.filter((e) => !e.real && e.status === 'live').slice(0, 3).map((e) => e.id);
   return (
     <div className="no-scrollbar mt-5 min-h-0 flex-1 overflow-y-auto">
-      <div className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-faint">Виды спорта</div>
-      {SPORT_ORDER.map((s) => {
-        const c = counts.data?.[s];
-        const n = (c?.live ?? 0) + (c?.upcoming ?? 0);
-        if (counts.data && !n) return null;
-        return (
-          <NavLink key={s} to={`/?sport=${s}`} className={clsx('flex h-9 items-center gap-3 rounded-xl px-3 text-[13.5px] font-semibold transition-colors', cur === s ? 'bg-surface2 text-ink' : 'text-muted hover:bg-surface hover:text-ink')}>
-            <SportIcon sport={s} size={16} />
-            <span className="flex-1">{SPORT_NAMES[s]}</span>
-            {!!c?.live && <span className="num rounded-full bg-live/15 px-1.5 text-[10.5px] font-extrabold text-live">{c.live}</span>}
-            <span className="num w-6 text-right text-[11.5px] font-bold text-faint">{counts.data ? n : ''}</span>
-          </NavLink>
-        );
-      })}
+      {leagues.size > 0 && <div className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-faint">Турниры</div>}
+      {[...leagues.values()].sort((a, b) => LEAGUE_ORDER.indexOf(a.league.id) - LEAGUE_ORDER.indexOf(b.league.id)).map(({ league, n }) => (
+        <NavLink key={league.id} to={`/?league=${league.id}`} className={clsx('flex h-9 items-center gap-3 rounded-xl px-3 text-[13.5px] font-semibold transition-colors', cur === league.id ? 'bg-surface2 text-ink' : 'text-muted hover:bg-surface hover:text-ink')}>
+          <Flag code={league.country} />
+          <span className="min-w-0 flex-1 truncate">{league.name}</span>
+          <span className="num w-6 text-right text-[11.5px] font-bold text-faint">{n}</span>
+        </NavLink>
+      ))}
       {liveIds.length > 0 && (
         <>
           <div className="mt-5 flex items-center gap-2 px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-faint">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live" /> Сейчас в лайве
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live" /> Виртуальный лайв
           </div>
           {liveIds.map((id) => (
             <MiniLive key={id} id={id} />
           ))}
-          <NavLink to="/live" className="block px-3 py-1.5 text-[12.5px] font-bold text-accent">
-            Все матчи в лайве →
+          <NavLink to="/virtual" className="block px-3 py-1.5 text-[12.5px] font-bold text-accent">
+            Все виртуальные матчи →
           </NavLink>
         </>
       )}

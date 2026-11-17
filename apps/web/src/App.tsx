@@ -29,7 +29,7 @@ function useTelegramBackButton() {
   const nav = useNavigate();
   useEffect(() => {
     if (!tg) return;
-    const root = ['/', '/live', '/bets', '/profile'].includes(loc.pathname);
+    const root = ['/', '/virtual', '/live', '/bets', '/profile'].includes(loc.pathname);
     const back = () => (window.history.length > 1 ? nav(-1) : nav('/'));
     try {
       if (root) tg.BackButton.hide();
@@ -165,6 +165,7 @@ export default function App() {
         <Suspense fallback={<Splash />}>
           <Routes location={loc}>
             <Route path="/" element={<Home />} />
+            <Route path="/virtual" element={<Live />} />
             <Route path="/live" element={<Live />} />
             <Route path="/event/:id" element={<EventPage />} />
             <Route path="/bets" element={<Bets />} />

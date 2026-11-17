@@ -4,6 +4,7 @@ import { q } from '../db.js';
 import { hashStr, mathRng, pick } from '../rng.js';
 import { SPORTS, SPORT_ORDER, type Incident, type Scoreboard, type SportId, type Team } from '../sports/index.js';
 import { LEAGUES, leagueById, type League } from '../teams.js';
+import { realLeagueById } from '../real/leagues.js';
 import { price, type PricedMarket } from './pricing.js';
 
 export type EventStatus = 'scheduled' | 'live' | 'finished' | 'cancelled';
@@ -47,7 +48,21 @@ export function setFinishHandler(fn: (ev: LiveEvent) => void) {
 const seedOf = (ev: LiveEvent) => hashStr(ev.id);
 const speedOf = (sport: SportId) => env.liveSpeed * SPORTS[sport].speedFactor;
 
+/** Сведения о реальном матче (football-data.org) хранятся прямо в state, отдельная колонка в базе не нужна. */
+export interface RealInfo {
+  mid: number;
+  comp: string;
+  status: string;
+  score: [number, number] | null;
+  finishedAt?: number;
+}
+
+export const isReal = (ev: LiveEvent): boolean => !!ev.state?.real;
+export const realOf = (ev: LiveEvent): RealInfo | null => ev.state?.real ?? null;
+
 export function isSuspended(ev: LiveEvent, now = Date.now()) {
+  // реальный матч после стартового свистка: ставок и выкупа нет, ждём итог
+  if (isReal(ev) && ev.status === 'live') return true;
   return ev.suspended || ev.suspendUntil > now || ev.status === 'finished' || ev.status === 'cancelled';
 }
 
@@ -117,6 +132,62 @@ export function createEvent(opts: { sport: SportId; startAt: number; leagueId?: 
   events.set(id, ev);
   persist(ev, true);
   return ev;
+}
+
+/** Реальный матч: команды и время из расписания, коэффициенты считает наша модель по силе команд. */
+export function createRealEvent(opts: { id: string; leagueId: string; home: Team; away: Team; startAt: number; top: boolean; real: RealInfo }): LiveEvent {
+  const sport = SPORTS.football;
+  // детерминированный «случай»: после перезапуска тот же матч получит ту же модель
+  let x = hashStr(opts.id) || 1;
+  const rng = () => (x = (Math.imul(x, 1664525) + 1013904223) >>> 0) / 4294967296;
+  const state = sport.create(opts.home, opts.away, rng);
+  state.real = opts.real;
+  const ev: LiveEvent = {
+    id: opts.id,
+    sport: 'football',
+    leagueId: opts.leagueId,
+    home: opts.home,
+    away: opts.away,
+    startAt: opts.startAt,
+    status: 'scheduled',
+    state,
+    result: null,
+    markets: [],
+    top: opts.top,
+    overrides: {},
+    suspended: false,
+    suspendUntil: 0,
+    manual: false,
+    finishedAt: null,
+    dirty: false,
+    lastPriced: 0,
+  };
+  reprice(ev, 3000);
+  events.set(ev.id, ev);
+  persist(ev, true);
+  return ev;
+}
+
+/** Реальный матч завершён: записываем итог и рассчитываем ставки. */
+export function finishReal(ev: LiveEvent, result: { reg: [number, number]; p1: [number, number]; winner: 0 | 1 | null; final: [number, number] }) {
+  if (ev.status === 'finished' || ev.status === 'cancelled') return;
+  const st = ev.state;
+  st.phase = 'ft';
+  st.ps = [result.p1, [result.reg[0] - result.p1[0], result.reg[1] - result.p1[1]]];
+  st.real.score = result.final;
+  st.real.status = 'FINISHED';
+  st.real.finishedAt = Date.now();
+  ev.status = 'finished';
+  ev.result = result;
+  ev.finishedAt = Date.now();
+  ev.markets = [];
+  persist(ev);
+  try {
+    onFinish(ev);
+  } catch (e) {
+    console.error('Ошибка расчёта события', ev.id, e);
+  }
+  bus.emit('event:update', [ev]);
 }
 
 /** Создать матч, который уже идёт (для наполнения лайва при старте). */
@@ -192,7 +263,7 @@ function loadFromDb() {
       dirty: false,
       lastPriced: 0,
     };
-    if (ev.status !== 'finished' && ev.status !== 'cancelled') reprice(ev);
+    if (ev.status === 'scheduled' || (ev.status === 'live' && !isReal(ev))) reprice(ev);
     events.set(ev.id, ev);
   }
 }
@@ -213,6 +284,7 @@ function finish(ev: LiveEvent) {
 
 /** Принудительно доиграть матч (админка). */
 export function forceFinish(ev: LiveEvent) {
+  if (isReal(ev)) return; // реальный матч заканчивается только по данным источника
   const s = SPORTS[ev.sport];
   if (ev.status === 'scheduled') {
     s.start(ev.state);
@@ -247,6 +319,16 @@ function tick() {
   const changed: LiveEvent[] = [];
   for (const ev of events.values()) {
     const s = SPORTS[ev.sport];
+    if (isReal(ev)) {
+      // реальный матч не симулируем: в момент начала закрываем ставки и ждём итог от источника
+      if (ev.status === 'scheduled' && ev.startAt <= now) {
+        ev.status = 'live';
+        ev.markets = [];
+        persist(ev);
+        changed.push(ev);
+      }
+      continue;
+    }
     if (ev.status === 'scheduled' && ev.startAt <= now) {
       ev.status = 'live';
       s.start(ev.state);
@@ -282,7 +364,7 @@ function maintain() {
     if ((ev.status === 'finished' || ev.status === 'cancelled') && ev.finishedAt && now - ev.finishedAt > KEEP_FINISHED_MS) events.delete(id);
   }
   for (const sport of SPORT_ORDER) {
-    const list = [...events.values()].filter((e) => e.sport === sport);
+    const list = [...events.values()].filter((e) => e.sport === sport && !isReal(e));
     const live = list.filter((e) => e.status === 'live').length;
     const sched = list.filter((e) => e.status === 'scheduled');
     const soon = sched.filter((e) => e.startAt - now < 6 * 60 * 1000).length;
@@ -306,7 +388,7 @@ export function flush() {
 
 export function startEngine() {
   loadFromDb();
-  const liveNow = [...events.values()].filter((e) => e.status === 'live').length;
+  const liveNow = [...events.values()].filter((e) => e.status === 'live' && !isReal(e)).length;
   if (liveNow === 0) {
     for (const sport of SPORT_ORDER) for (let i = 0; i < TARGET_LIVE[sport]; i++) createLiveInProgress(sport);
   }
@@ -320,6 +402,8 @@ export function startEngine() {
 /* ---------- представление для API ---------- */
 
 export function leagueInfo(id: string) {
+  const r = realLeagueById.get(id);
+  if (r) return { id: r.id, name: r.name, country: r.country };
   const l = leagueById.get(id);
   return l ? { id: l.id, name: l.name, country: l.country } : { id, name: id, country: 'world' };
 }
@@ -337,11 +421,30 @@ export interface EventSummary {
   sb: Omit<Scoreboard, 'stats'>;
   main: PricedMarket | null;
   marketsCount: number;
+  real: boolean;
+}
+
+function realScoreboard(ev: LiveEvent, sb: Omit<Scoreboard, 'stats'>): Omit<Scoreboard, 'stats'> {
+  const r = realOf(ev)!;
+  if (ev.status === 'live') {
+    const paused = r.status === 'PAUSED';
+    return {
+      score: r.score ?? [0, 0],
+      clock: paused ? 'HT' : 'LIVE',
+      period: paused ? 'Перерыв · ставки закрыты' : 'Идёт матч · ставки закрыты',
+      detail: 'Расчёт по итоговому счёту',
+      isBreak: paused,
+    };
+  }
+  if (ev.status === 'cancelled') return { score: [0, 0], clock: '—', period: r.status === 'POSTPONED' ? 'Перенесён · возврат ставок' : 'Отменён · возврат ставок' };
+  return sb;
 }
 
 export function summary(ev: LiveEvent): EventSummary {
   const s = SPORTS[ev.sport];
-  const { stats: _stats, ...sb } = s.scoreboard(ev.state);
+  const { stats: _stats, ...sb0 } = s.scoreboard(ev.state);
+  const real = isReal(ev);
+  const sb = real ? realScoreboard(ev, sb0) : sb0;
   return {
     id: ev.id,
     sport: ev.sport,
@@ -360,6 +463,7 @@ export function summary(ev: LiveEvent): EventSummary {
       ev.markets.find((m) => m.outcomes.length <= 3 && m.outcomes.every((o) => o.odds)) ??
       null,
     marketsCount: ev.markets.reduce((a, m) => a + m.outcomes.filter((o) => o.odds).length, 0),
+    real,
   };
 }
 
@@ -368,7 +472,7 @@ export function full(ev: LiveEvent) {
   const sb = s.scoreboard(ev.state);
   return {
     ...summary(ev),
-    stats: sb.stats ?? [],
+    stats: isReal(ev) ? [] : sb.stats ?? [],
     markets: ev.markets,
     incidents: (ev.state.inc ?? []).slice(-20).reverse(),
   };

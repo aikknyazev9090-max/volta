@@ -45,6 +45,8 @@ export interface EventSummary {
   sb: Scoreboard;
   main: Market | null;
   marketsCount: number;
+  /** Настоящий матч из расписания: ставки только до начала, расчёт по итоговому счёту. */
+  real?: boolean;
 }
 
 export interface Incident {

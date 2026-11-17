@@ -151,6 +151,35 @@ const FLAG: Record<string, JSX.Element> = {
       <rect width="11" height="9" fill="#3C3B6E" />
     </>
   ),
+  fr: (
+    <>
+      <rect width="8" height="18" fill="#002654" />
+      <rect x="8" width="8" height="18" fill="#fff" />
+      <rect x="16" width="8" height="18" fill="#CE1126" />
+    </>
+  ),
+  nl: (
+    <>
+      <rect width="24" height="6" fill="#AE1C28" />
+      <rect y="6" width="24" height="6" fill="#fff" />
+      <rect y="12" width="24" height="6" fill="#21468B" />
+    </>
+  ),
+  pt: (
+    <>
+      <rect width="24" height="18" fill="#FF0000" />
+      <rect width="9.6" height="18" fill="#006600" />
+      <circle cx="9.6" cy="9" r="3.2" fill="#FFCC00" />
+    </>
+  ),
+  eu: (
+    <>
+      <rect width="24" height="18" fill="#1B3F95" />
+      {Array.from({ length: 12 }, (_, i) => (
+        <circle key={i} cx={12 + 5 * Math.cos((i * Math.PI) / 6)} cy={9 + 5 * Math.sin((i * Math.PI) / 6)} r="0.8" fill="#FFDD00" />
+      ))}
+    </>
+  ),
 };
 
 export function Flag({ code, className }: { code: string; className?: string }) {

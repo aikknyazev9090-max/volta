@@ -21,6 +21,8 @@ services:
         value: "true"
       - key: LIVE_SPEED
         value: "6"
+      - key: FOOTBALL_DATA_KEY
+        sync: false
       - key: DEV_AUTH
         value: "false"
       - key: REAL_MONEY_ENABLED

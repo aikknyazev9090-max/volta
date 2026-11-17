@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BalancePill } from '../components/Chrome';
 import { Flag, SportIcon } from '../components/icons';
+import { RealBadge } from '../components/MatchCard';
 import { OddsButton } from '../components/OddsButton';
 import { BetModeSwitch, EventAbout, SimpleBets } from '../components/SimpleBets';
 import { TeamBadge } from '../components/TeamBadge';
@@ -41,6 +42,7 @@ function Hero({ ev }: { ev: EventFull }) {
         <SportIcon sport={ev.sport} size={14} />
         <Flag code={ev.league.country} />
         <span className="truncate">{ev.league.name}</span>
+        {ev.real ? <RealBadge className="ml-1" /> : <span className="ml-1 rounded-md bg-surface2 px-1.5 py-[1px] text-[10px] font-extrabold uppercase tracking-wide text-muted">Виртуальный</span>}
       </div>
       <div className="relative mt-4 grid grid-cols-[1fr_auto_1fr] items-start gap-2">
         {[ev.home, ev.away].map((t, side) => (
@@ -156,7 +158,7 @@ function MarketCard({ title, markets, ev, defaultOpen }: { title: string; market
 function Markets({ ev }: { ev: EventFull }) {
   const mode = useUi((s) => s.betMode);
   if (!ev.markets.length) {
-    return <EmptyState icon={<Lock size={28} />} title={ev.status === 'finished' ? 'Матч завершён' : 'Ставки закрыты'} text={ev.status === 'finished' ? 'Ставки по этому матчу рассчитаны.' : 'Приём ставок временно приостановлен. Коэффициенты скоро вернутся.'} />;
+    return <EmptyState icon={<Lock size={28} />} title={ev.status === 'finished' ? 'Матч завершён' : 'Ставки закрыты'} text={ev.status === 'finished' ? 'Ставки по этому матчу рассчитаны.' : ev.real ? 'Это настоящий матч: ставки принимаются только до начала. Расчёт — по итоговому счёту, он появится в течение часа после финального свистка.' : 'Приём ставок временно приостановлен. Коэффициенты скоро вернутся.'} />;
   }
   return (
     <div>

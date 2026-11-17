@@ -34,7 +34,10 @@ export function BetModeSwitch({ className }: { className?: string }) {
 /** Описание матча: о чём он и чего ждать. */
 export function EventAbout({ ev }: { ev: EventFull }) {
   const [open, setOpen] = useState(false);
-  const lines = describeEvent(ev);
+  const lines = [
+    ...(ev.real ? ['Это настоящий матч. Ставки принимаются до стартового свистка, расчёт — по итоговому счёту основного времени (появляется с небольшой задержкой). Коэффициенты считает наша модель по рейтингу силы клубов.'] : []),
+    ...describeEvent(ev),
+  ];
   const shown = open ? lines : lines.slice(0, 2);
   return (
     <div className="card mx-3 mb-3 p-4">

@@ -12,6 +12,11 @@ import { OddsButton } from './OddsButton';
 import { TeamBadge } from './TeamBadge';
 import { LiveDot } from './ui';
 
+/** Пометка настоящего матча. */
+export function RealBadge({ className }: { className?: string }) {
+  return <span className={clsx('shrink-0 rounded-md bg-accent/15 px-1.5 py-[1px] text-[10px] font-extrabold uppercase tracking-wide text-accent', className)}>Реальный</span>;
+}
+
 export function MatchClock({ ev, className }: { ev: EventSummary; className?: string }) {
   if (ev.status === 'live') {
     return (
@@ -53,6 +58,7 @@ export const MatchCard = memo(function MatchCard({ id, showLeague = false }: { i
   return (
     <motion.div layout="position" className="px-3.5 py-3">
       <button onClick={open} className="flex w-full items-center gap-2 text-left">
+        {showLeague && !ev.real && <span className="shrink-0 rounded-md bg-surface2 px-1.5 py-[1px] text-[10px] font-extrabold uppercase tracking-wide text-muted">Вирт.</span>}
         <MatchClock ev={ev} className="min-w-0 truncate" />
         {showLeague && <span className="truncate text-[11.5px] font-medium text-faint">· {ev.league.name}</span>}
         {ev.sb.detail && ev.status === 'live' && <span className="num ml-auto truncate pl-2 text-[11px] font-semibold text-faint">{ev.sb.detail}</span>}
@@ -75,7 +81,7 @@ export const MatchCard = memo(function MatchCard({ id, showLeague = false }: { i
           main.outcomes.map((o) => <OddsButton key={o.key} ev={ev} market={main} outcome={o} variant="inline" />)
         ) : (
           <div className="col-span-3 flex h-[46px] items-center justify-center gap-2 rounded-[13px] bg-surface2 text-[12.5px] font-semibold text-muted">
-            <Lock size={13} /> Приём ставок приостановлен
+            <Lock size={13} /> {ev.real && ev.status === 'live' ? 'Ставки закрыты · расчёт по итоговому счёту' : 'Приём ставок приостановлен'}
           </div>
         )}
       </div>
