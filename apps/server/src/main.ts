@@ -39,11 +39,20 @@ async function restore() {
     process.env.TG_BACKUP_MSG = String(pin.message_id);
     console.log(`[restore] база восстановлена из копии (${Math.round(buf.length / 1024)} КБ)`);
   } catch (e: any) {
-    console.warn('[restore] не удалось восстановить базу:', e?.message ?? e);
+    console.warn('[restore] не удалось восстановить базу:', e?.message ?? e, e?.cause?.code ?? '');
     // чтобы пустая база не затёрла хорошую копию, сохранение копий в этом запуске выключаем
     process.env.TG_BACKUP_BLOCKED = '1';
   }
 }
 
-await restore();
+// сеть на хостинге бывает не готова в первые секунды после старта — пробуем несколько раз
+for (let attempt = 1; attempt <= 6; attempt++) {
+  delete process.env.TG_BACKUP_BLOCKED;
+  await restore();
+  if (!process.env.TG_BACKUP_BLOCKED) break;
+  if (attempt < 6) {
+    console.log(`[restore] повтор через ${attempt * 3} с (попытка ${attempt + 1} из 6)`);
+    await new Promise((r) => setTimeout(r, attempt * 3000));
+  }
+}
 await import('./index.js');
