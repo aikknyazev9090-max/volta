@@ -1,19 +1,21 @@
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, ChevronDown, Lock, Star, Trophy } from 'lucide-react';
+import { ArrowLeft, ChevronDown, HelpCircle, Lock, Star, Trophy } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BalancePill } from '../components/Chrome';
 import { Flag, SportIcon } from '../components/icons';
 import { OddsButton } from '../components/OddsButton';
+import { BetModeSwitch, EventAbout, SimpleBets } from '../components/SimpleBets';
 import { TeamBadge } from '../components/TeamBadge';
+import { marketHelp } from '../lib/explain';
 import { Button, EmptyState, ErrorState, LiveDot, Segmented, Skeleton, useNow } from '../components/ui';
 import { api, onWs, subscribeEvent } from '../lib/api';
 import { countdown, dayLabel, SPORT_NAMES, time } from '../lib/format';
 import { useEventFull, useMe } from '../lib/queries';
 import { haptic, inTelegram } from '../lib/tg';
-import { useEventsStore } from '../store';
+import { useEventsStore, useUi } from '../store';
 import type { EventFull, Incident, Market } from '../types';
 
 const GROUPS: { key: Market['group'] | 'all'; label: string }[] = [
@@ -101,11 +103,28 @@ function Hero({ ev }: { ev: EventFull }) {
 
 function MarketCard({ title, markets, ev, defaultOpen }: { title: string; markets: Market[]; ev: EventFull; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
+  const [help, setHelp] = useState(false);
   const lines = markets.length > 1;
+  const helpText = marketHelp(markets[0], ev);
   return (
     <motion.div layout="position" className="card overflow-hidden">
       <button onClick={() => { haptic.select(); setOpen(!open); }} className="flex w-full items-center gap-2 px-4 py-3 text-left">
         <span className="flex-1 text-[14px] font-extrabold">{title}</span>
+        {helpText && (
+          <span
+            role="button"
+            aria-label="Что это за ставка"
+            onClick={(e) => {
+              e.stopPropagation();
+              haptic.select();
+              setHelp(!help);
+              if (!open) setOpen(true);
+            }}
+            className={clsx('grid h-7 w-7 place-items-center rounded-full', help ? 'bg-accent/15 text-accent' : 'text-faint')}
+          >
+            <HelpCircle size={16} />
+          </span>
+        )}
         {lines && <span className="text-[11.5px] font-bold text-faint">{markets.length} линии</span>}
         <motion.span animate={{ rotate: open ? 180 : 0 }}>
           <ChevronDown size={18} className="text-faint" />
@@ -115,6 +134,7 @@ function MarketCard({ title, markets, ev, defaultOpen }: { title: string; market
         {open && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22 }} className="overflow-hidden">
             <div className="space-y-1.5 px-3 pb-3">
+              {help && <div className="mb-1 rounded-xl bg-surface2 px-3 py-2.5 text-[12.5px] leading-snug text-ink/80">{helpText}</div>}
               {markets.map((m) => {
                 const grid = m.layout === 'grid' || m.outcomes.length > 3;
                 return (
@@ -134,6 +154,35 @@ function MarketCard({ title, markets, ev, defaultOpen }: { title: string; market
 }
 
 function Markets({ ev }: { ev: EventFull }) {
+  const mode = useUi((s) => s.betMode);
+  if (!ev.markets.length) {
+    return <EmptyState icon={<Lock size={28} />} title={ev.status === 'finished' ? 'Матч завершён' : 'Ставки закрыты'} text={ev.status === 'finished' ? 'Ставки по этому матчу рассчитаны.' : 'Приём ставок временно приостановлен. Коэффициенты скоро вернутся.'} />;
+  }
+  return (
+    <div>
+      <EventAbout ev={ev} />
+      <BetModeSwitch className="mx-3 mb-3" />
+      <SuspendNote ev={ev} />
+      {mode === 'simple' ? <SimpleBets ev={ev} /> : <ProMarkets ev={ev} />}
+    </div>
+  );
+}
+
+function SuspendNote({ ev }: { ev: EventFull }) {
+  return (
+    <AnimatePresence>
+      {ev.suspended && ev.status === 'live' && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mx-3 mb-2 overflow-hidden">
+          <div className="flex items-center gap-2 rounded-xl bg-gold/10 px-3 py-2.5 text-[12.5px] font-bold text-gold">
+            <Lock size={14} /> Опасный момент — приём ставок на паузе несколько секунд
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function ProMarkets({ ev }: { ev: EventFull }) {
   const [group, setGroup] = useState<(typeof GROUPS)[number]['key']>('all');
   const present = new Set(ev.markets.map((m) => m.group));
   const groups = GROUPS.filter((g) => g.key === 'all' || present.has(g.key as Market['group']));
@@ -147,9 +196,6 @@ function Markets({ ev }: { ev: EventFull }) {
     return [...map.entries()];
   }, [ev.markets, group]);
 
-  if (!ev.markets.length) {
-    return <EmptyState icon={<Lock size={28} />} title={ev.status === 'finished' ? 'Матч завершён' : 'Рынки закрыты'} text={ev.status === 'finished' ? 'Ставки по этому матчу рассчитаны.' : 'Приём ставок временно приостановлен. Коэффициенты скоро вернутся.'} />;
-  }
   return (
     <div>
       <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-4 pb-3">
@@ -159,15 +205,6 @@ function Markets({ ev }: { ev: EventFull }) {
           </button>
         ))}
       </div>
-      <AnimatePresence>
-        {ev.suspended && ev.status === 'live' && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mx-3 mb-2 overflow-hidden">
-            <div className="flex items-center gap-2 rounded-xl bg-gold/10 px-3 py-2.5 text-[12.5px] font-bold text-gold">
-              <Lock size={14} /> Опасный момент — приём ставок на паузе
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       <div className="space-y-2 px-3">
         {cards.map(([title, ms], i) => (
           <MarketCard key={title} title={title} markets={ms} ev={ev} defaultOpen={i < 6} />
@@ -322,13 +359,11 @@ export default function EventPage() {
               ]}
             />
           </div>
-          <AnimatePresence mode="wait">
-            <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-              {tab === 'bets' && <Markets ev={ev} />}
-              {tab === 'stats' && <Stats ev={ev} />}
-              {tab === 'timeline' && <Timeline ev={ev} />}
-            </motion.div>
-          </AnimatePresence>
+          <div key={tab} className="animate-page-in">
+            {tab === 'bets' && <Markets ev={ev} />}
+            {tab === 'stats' && <Stats ev={ev} />}
+            {tab === 'timeline' && <Timeline ev={ev} />}
+          </div>
         </>
       )}
     </div>

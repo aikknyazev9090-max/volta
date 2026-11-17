@@ -153,6 +153,9 @@ export const toast = (t: Omit<Toast, 'id'>) => useToasts.getState().push(t);
 
 interface UiState {
   theme: 'dark' | 'light';
+  /** simple — только главные ставки с понятными подписями; pro — все рынки */
+  betMode: 'simple' | 'pro';
+  setBetMode: (m: 'simple' | 'pro') => void;
   bonusOpen: boolean;
   setTheme: (t: 'dark' | 'light') => void;
   setBonusOpen: (o: boolean) => void;
@@ -162,10 +165,12 @@ export const useUi = create<UiState>()(
   persist(
     (set) => ({
       theme: 'dark',
+      betMode: 'simple',
+      setBetMode: (betMode) => set({ betMode }),
       bonusOpen: false,
       setTheme: (theme) => set({ theme }),
       setBonusOpen: (bonusOpen) => set({ bonusOpen }),
     }),
-    { name: 'volta.ui', storage: safeStorage, partialize: (s) => ({ theme: s.theme }) },
+    { name: 'volta.ui', storage: safeStorage, partialize: (s) => ({ theme: s.theme, betMode: s.betMode }) },
   ),
 );

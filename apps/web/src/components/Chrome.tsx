@@ -1,11 +1,11 @@
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Gift, Home, Radio, Search, Ticket, User } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Gift, HelpCircle, Home, Radio, Search, Ticket, Trophy, User } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useMe } from '../lib/queries';
+import { useEventList, useMe, useSportCounts } from '../lib/queries';
 import { haptic } from '../lib/tg';
-import { useSlip, useUi } from '../store';
+import { useEvent, useSlip, useUi } from '../store';
 import { Coin, Logo, SportIcon, Wordmark } from './icons';
 import { AnimatedNumber } from './ui';
 import { SPORT_NAMES, SPORT_ORDER } from '../lib/format';
@@ -160,9 +160,124 @@ export function SportChips({ value, onChange, counts, mode }: { value: SportId |
     );
   };
   return (
-    <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 py-1">
+    <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 py-1 lg:flex-wrap lg:overflow-visible">
       {chip(null, 'Все', total)}
       {SPORT_ORDER.filter((s) => n(s) !== 0).map((s) => chip(s, SPORT_NAMES[s], n(s)))}
+    </div>
+  );
+}
+
+/** true на широком экране (компьютер): там меню слева и купон справа. */
+export function useIsDesktop() {
+  const q = '(min-width: 1024px)';
+  const [v, setV] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches);
+  useEffect(() => {
+    const m = window.matchMedia(q);
+    const on = () => setV(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return v;
+}
+
+const SIDE = [
+  { to: '/', label: 'Главная', icon: Home },
+  { to: '/live', label: 'Лайв', icon: Radio },
+  { to: '/bets', label: 'Мои ставки', icon: Ticket },
+  { to: '/leaderboard', label: 'Рейтинг', icon: Trophy },
+  { to: '/profile', label: 'Профиль', icon: User },
+  { to: '/help', label: 'Как делать ставки', icon: HelpCircle },
+];
+
+/** Левое меню на компьютере. */
+export function SideNav() {
+  const loc = useLocation();
+  const nav = useNavigate();
+  return (
+    <aside className="sticky top-0 flex h-dvh w-[232px] shrink-0 flex-col gap-1 py-5">
+      <button className="mb-5 flex items-center gap-2.5 px-3" onClick={() => nav('/')}>
+        <Logo size={34} />
+        <Wordmark className="text-[19px]" />
+      </button>
+      {SIDE.map((n) => {
+        const Icon = n.icon;
+        const active = n.to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(n.to);
+        return (
+          <NavLink key={n.to} to={n.to} className={clsx('flex h-11 items-center gap-3 rounded-xl px-3 text-[14.5px] font-bold transition-colors', active ? 'bg-surface2 text-ink' : 'text-muted hover:bg-surface hover:text-ink')}>
+            <span className="relative">
+              <Icon size={20} strokeWidth={active ? 2.4 : 2} className={active ? 'text-accent' : ''} />
+              {n.to === '/live' && <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full border-2 border-bg bg-live" />}
+            </span>
+            {n.label}
+          </NavLink>
+        );
+      })}
+      <SideExtras />
+      <div className="mt-3 flex items-center gap-2 border-t border-line px-1 pt-3">
+        <BonusButton />
+        <BalancePill />
+      </div>
+    </aside>
+  );
+}
+
+/** Компактная строка лайв-матча для боковой колонки. */
+function MiniLive({ id }: { id: string }) {
+  const ev = useEvent(id);
+  if (!ev || ev.status !== 'live') return null;
+  return (
+    <NavLink to={`/event/${ev.id}`} className="block rounded-xl px-3 py-2 transition-colors hover:bg-surface">
+      <div className="flex items-center gap-1.5 text-[10.5px] font-bold text-faint">
+        <SportIcon sport={ev.sport} size={11} />
+        <span className="truncate">{ev.league.name}</span>
+        <span className="num ml-auto shrink-0 text-live">{ev.sb.clock}</span>
+      </div>
+      {[ev.home, ev.away].map((t, i) => (
+        <div key={t.id} className="mt-0.5 flex items-center gap-2 text-[12.5px] font-semibold">
+          <span className="min-w-0 flex-1 truncate">{t.name}</span>
+          <span className="num font-extrabold">{ev.sb.score[i]}</span>
+        </div>
+      ))}
+    </NavLink>
+  );
+}
+
+/** Нижняя часть левого меню: виды спорта и пара матчей в лайве. */
+function SideExtras() {
+  const counts = useSportCounts();
+  const live = useEventList('live');
+  const loc = useLocation();
+  const cur = loc.pathname === '/' ? new URLSearchParams(loc.search).get('sport') : null;
+  const liveIds = (live.data ?? []).slice(0, 3).map((e) => e.id);
+  return (
+    <div className="no-scrollbar mt-5 min-h-0 flex-1 overflow-y-auto">
+      <div className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-faint">Виды спорта</div>
+      {SPORT_ORDER.map((s) => {
+        const c = counts.data?.[s];
+        const n = (c?.live ?? 0) + (c?.upcoming ?? 0);
+        if (counts.data && !n) return null;
+        return (
+          <NavLink key={s} to={`/?sport=${s}`} className={clsx('flex h-9 items-center gap-3 rounded-xl px-3 text-[13.5px] font-semibold transition-colors', cur === s ? 'bg-surface2 text-ink' : 'text-muted hover:bg-surface hover:text-ink')}>
+            <SportIcon sport={s} size={16} />
+            <span className="flex-1">{SPORT_NAMES[s]}</span>
+            {!!c?.live && <span className="num rounded-full bg-live/15 px-1.5 text-[10.5px] font-extrabold text-live">{c.live}</span>}
+            <span className="num w-6 text-right text-[11.5px] font-bold text-faint">{counts.data ? n : ''}</span>
+          </NavLink>
+        );
+      })}
+      {liveIds.length > 0 && (
+        <>
+          <div className="mt-5 flex items-center gap-2 px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-faint">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live" /> Сейчас в лайве
+          </div>
+          {liveIds.map((id) => (
+            <MiniLive key={id} id={id} />
+          ))}
+          <NavLink to="/live" className="block px-3 py-1.5 text-[12.5px] font-bold text-accent">
+            Все матчи в лайве →
+          </NavLink>
+        </>
+      )}
     </div>
   );
 }

@@ -2,10 +2,11 @@ import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Lock } from 'lucide-react';
 import { memo, useEffect, useRef, useState } from 'react';
-import { fmtOdds } from '../lib/format';
+import { humanOutcome, shortOutcome, winFor } from '../lib/explain';
+import { coins, fmtOdds } from '../lib/format';
 import { useMe } from '../lib/queries';
 import { haptic } from '../lib/tg';
-import { isSelected, toast, useSlip } from '../store';
+import { isSelected, toast, useSlip, useUi } from '../store';
 import type { EventSummary, Market, Outcome } from '../types';
 
 export function useOddsFormat() {
@@ -16,11 +17,17 @@ interface Props {
   ev: Pick<EventSummary, 'id' | 'sport' | 'home' | 'away' | 'status' | 'suspended'>;
   market: Pick<Market, 'key' | 'title'>;
   outcome: Outcome;
-  variant?: 'stack' | 'inline' | 'compact';
+  variant?: 'stack' | 'inline' | 'compact' | 'simple';
+  /** для варианта simple: подпись и пояснение */
+  title?: string;
+  sub?: string;
   className?: string;
 }
 
-export const OddsButton = memo(function OddsButton({ ev, market, outcome, variant = 'stack', className }: Props) {
+export const OddsButton = memo(function OddsButton({ ev, market, outcome, variant = 'stack', className, title, sub }: Props) {
+  const simpleMode = useUi((s) => s.betMode === 'simple');
+  const shown = simpleMode ? shortOutcome(market, outcome, ev) : outcome.label;
+  const human = humanOutcome(market, outcome, ev);
   const fmt = useOddsFormat();
   const selected = useSlip((s) => isSelected(s.items, ev.id, market.key, outcome.key));
   const toggle = useSlip((s) => s.toggle);
@@ -50,14 +57,14 @@ export const OddsButton = memo(function OddsButton({ ev, market, outcome, varian
       market: market.key,
       outcome: outcome.key,
       odds: outcome.odds,
-      label: outcome.label,
+      label: human,
       marketTitle: market.title,
       sport: ev.sport,
       home: ev.home,
       away: ev.away,
       live: ev.status === 'live',
     });
-    if (r === 'added' && useSlip.getState().items.length === 1) toast({ kind: 'info', title: 'Добавлено в купон', text: `${outcome.label} · ${fmtOdds(outcome.odds, fmt)}` });
+    if (r === 'added' && useSlip.getState().items.length === 1) toast({ kind: 'info', title: 'Добавлено в купон', text: `${human} · ${fmtOdds(outcome.odds, fmt)}. Откройте купон, чтобы поставить` });
   };
 
   return (
@@ -66,26 +73,39 @@ export const OddsButton = memo(function OddsButton({ ev, market, outcome, varian
       transition={{ type: 'spring', stiffness: 700, damping: 30 }}
       onClick={onClick}
       aria-pressed={selected}
-      aria-label={`${market.title}: ${outcome.label}${locked ? ', закрыто' : `, коэффициент ${fmtOdds(outcome.odds!, fmt)}`}`}
+      aria-label={`${human}${locked ? ', закрыто' : `, коэффициент ${fmtOdds(outcome.odds!, fmt)}`}`}
       className={clsx(
         'relative flex min-w-0 select-none items-center overflow-hidden rounded-[13px] transition-colors duration-200',
         variant === 'stack' && 'h-[50px] flex-col justify-center gap-[1px] px-1',
         variant === 'inline' && 'h-[46px] justify-between gap-2 px-3',
         variant === 'compact' && 'h-[40px] flex-col justify-center px-1',
+        variant === 'simple' && 'min-h-[62px] w-full justify-between gap-3 px-4 py-2.5 text-left',
         selected ? 'bg-accent text-accentInk shadow-[0_6px_20px_-8px_rgb(var(--accent)/0.7)]' : 'bg-surface2 text-ink',
         locked && 'opacity-50',
         className,
       )}
     >
       {!selected && dir !== 0 && <motion.span initial={{ opacity: 0.55 }} animate={{ opacity: 0 }} transition={{ duration: 2 }} className={clsx('absolute inset-0', dir > 0 ? 'bg-up/30' : 'bg-down/30')} />}
-      {variant !== 'compact' && (
-        <span className={clsx('relative truncate text-[11.5px] font-semibold leading-tight', selected ? 'text-accentInk/70' : 'text-muted', variant === 'inline' && 'text-[12.5px]')}>{outcome.label}</span>
+      {variant === 'simple' ? (
+        <span className="relative min-w-0 flex-1">
+          <span className="block text-[14.5px] font-extrabold leading-snug">{title ?? human}</span>
+          {sub && <span className={clsx('mt-0.5 block text-[12px] font-semibold leading-snug', selected ? 'text-accentInk/70' : 'text-muted')}>{sub}</span>}
+        </span>
+      ) : (
+        variant !== 'compact' && <span className={clsx('relative truncate text-[11.5px] font-semibold leading-tight', selected ? 'text-accentInk/70' : 'text-muted', variant === 'inline' && 'text-[12.5px]')}>{shown}</span>
       )}
       <span className="relative flex items-center gap-1">
         {locked ? (
           <Lock size={14} className="text-muted" />
         ) : (
-          <span className={clsx('num font-extrabold', variant === 'compact' ? 'text-[14px]' : 'text-[15px]')}>{fmtOdds(outcome.odds!, fmt)}</span>
+          variant === 'simple' ? (
+            <span className="flex flex-col items-end">
+              <span className="num font-display text-[18px] font-bold leading-none">{fmtOdds(outcome.odds!, fmt)}</span>
+              <span className={clsx('num mt-1 whitespace-nowrap text-[11px] font-bold', selected ? 'text-accentInk/70' : 'text-up')}>100 → {coins(winFor(outcome.odds!))}</span>
+            </span>
+          ) : (
+            <span className={clsx('num font-extrabold', variant === 'compact' ? 'text-[14px]' : 'text-[15px]')}>{fmtOdds(outcome.odds!, fmt)}</span>
+          )
         )}
         <AnimatePresence>
           {dir !== 0 && !locked && (

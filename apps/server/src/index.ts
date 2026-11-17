@@ -55,7 +55,7 @@ await app.register(wsRoutes);
 if (existsSync(webDist)) {
   await app.register(fstatic, {
     root: webDist,
-    wildcard: false,
+    wildcard: true, // файлы читаются с диска при каждом запросе: после пересборки фронтенда сервер не нужно перезапускать
     cacheControl: false,
     setHeaders: (res, path) => {
       // файлы с хэшем в имени кэшируем надолго, index.html — никогда

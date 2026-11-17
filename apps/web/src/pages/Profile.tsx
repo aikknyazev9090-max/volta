@@ -8,6 +8,7 @@ import {
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '../components/Chrome';
+import { BetModeSwitch } from '../components/SimpleBets';
 import { Coin, SportIcon } from '../components/icons';
 import { AnimatedNumber, Button, ErrorState, Sheet, Skeleton, Toggle, useNow } from '../components/ui';
 import { api, ApiError } from '../lib/api';
@@ -249,10 +250,25 @@ export default function Profile() {
         </>
       )}
 
+      <section className="mt-6">
+        <Link to="/help" className="card press mx-4 flex items-center gap-3 px-4 py-3.5">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent/15 text-[17px]">📘</span>
+          <span className="flex-1">
+            <span className="block text-[14px] font-extrabold">Как делать ставки</span>
+            <span className="block text-[12px] text-muted">Инструкция для новичков и словарь терминов</span>
+          </span>
+          <span className="text-faint">›</span>
+        </Link>
+      </section>
+
       {/* настройки */}
       {me && (
         <section className="mt-6">
           <h3 className="mb-2.5 px-4 font-display text-[15px] font-semibold">Настройки</h3>
+          <div className="mx-4 mb-2">
+            <div className="mb-1.5 px-1 text-[12px] font-semibold text-muted">Режим ставок на странице матча</div>
+            <BetModeSwitch />
+          </div>
           <div className="card mx-4 divide-y divide-line overflow-hidden">
             <SettingRow icon={theme === 'dark' ? Moon : Sun} label="Тёмная тема">
               <Toggle checked={theme === 'dark'} onChange={(v) => setTheme(v ? 'dark' : 'light')} />

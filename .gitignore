@@ -5,3 +5,4 @@ apps/server/data/*.db*
 *.log
 .run/
 .claude/
+ЗАПУСК-ВЕБ.bat

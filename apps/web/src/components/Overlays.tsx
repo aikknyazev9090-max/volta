@@ -126,7 +126,7 @@ export function BonusSheet() {
         </div>
 
         <div className="relative mt-5">
-          <AnimatePresence mode="wait">
+          <>
             {justGot ? (
               <motion.div key="got" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex h-[54px] items-center justify-center gap-2 rounded-[18px] bg-up/15 font-display text-[18px] font-bold text-up">
                 +{coins(justGot)} <Coin size={20} />
@@ -141,7 +141,7 @@ export function BonusSheet() {
                 <span className="num font-display text-[17px] font-bold">{countdown(b.nextAt - now)}</span>
               </div>
             )}
-          </AnimatePresence>
+          </>
         </div>
       </div>
     </Sheet>
@@ -232,7 +232,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const last = i === SLIDES.length - 1;
   const s = SLIDES[i];
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] mx-auto flex max-w-[480px] flex-col bg-bg bg-aurora" style={{ paddingBottom: 'var(--safe-bottom)' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex justify-center bg-bg bg-aurora" style={{ paddingBottom: 'var(--safe-bottom)' }}>
+      <div className="flex w-full max-w-[480px] flex-col">
       <div className="flex items-center justify-between px-5 pt-4">
         <div className="flex items-center gap-2">
           <Logo size={26} />
@@ -245,13 +246,12 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         )}
       </div>
       <div className="flex flex-1 flex-col justify-center">
-        <AnimatePresence mode="wait">
-          <motion.div key={i} initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.28 }} className="px-7 text-center">
+        <div key={i} className="animate-page-in px-7 text-center">
             <SlideArt kind={s.art} />
             <h1 className="mt-8 font-display text-[25px] font-semibold leading-tight tracking-tight">{s.title}</h1>
             <p className="mx-auto mt-3 max-w-[320px] text-[15px] leading-relaxed text-muted">{s.text}</p>
-          </motion.div>
-        </AnimatePresence>
+          </div>
+        
       </div>
       <div className="px-5 pb-6">
         <div className="mb-5 flex justify-center gap-1.5">
@@ -262,7 +262,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         <Button size="lg" className="w-full" onClick={() => (last ? onDone() : setI(i + 1))}>
           {last ? 'Начать играть' : 'Далее'}
         </Button>
-        <p className="mt-3 text-center text-[11.5px] text-faint">Только для лиц старше 18 лет · Демо-режим без реальных денег</p>
+        <p className="mt-3 text-center text-[11.5px] text-faint">Демо-режим: виртуальные монеты, без реальных денег</p>
+      </div>
       </div>
     </motion.div>
   );

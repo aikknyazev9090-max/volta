@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
-import { ChevronRight, Gift, Trophy } from 'lucide-react';
+import { ChevronRight, Gift, GraduationCap, Trophy, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Header, SportChips } from '../components/Chrome';
 import { Coin } from '../components/icons';
 import { groupByLeague, LeagueGroup, MatchListSkeleton } from '../components/MatchCard';
@@ -11,6 +11,48 @@ import { coins, dayLabel } from '../lib/format';
 import { useEventList, useMe, useSportCounts } from '../lib/queries';
 import { useEventsStore, useUi } from '../store';
 import type { EventSummary, SportId } from '../types';
+
+/** Карточка «Как сделать ставку» для новичков; можно скрыть. */
+function HowTo() {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem('volta.howto.hidden') === '1';
+    } catch {
+      return false;
+    }
+  });
+  if (hidden) return null;
+  const hide = () => {
+    setHidden(true);
+    try {
+      localStorage.setItem('volta.howto.hidden', '1');
+    } catch {
+      /* приватный режим */
+    }
+  };
+  const steps = ['Выберите матч в списке ниже', 'Нажмите на вариант — например, на победу команды', 'В купоне введите сумму и нажмите «Поставить»'];
+  return (
+    <div className="card relative mx-4 mt-3 p-4">
+      <button aria-label="Скрыть" onClick={hide} className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full text-faint">
+        <X size={16} />
+      </button>
+      <div className="flex items-center gap-2 text-[14.5px] font-extrabold">
+        <GraduationCap size={18} className="text-accent" /> Как сделать ставку
+      </div>
+      <ol className="mt-3 space-y-2">
+        {steps.map((t, i) => (
+          <li key={t} className="flex items-center gap-2.5 text-[13px] font-semibold text-ink/85">
+            <span className="num grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent text-[12px] font-extrabold text-accentInk">{i + 1}</span>
+            {t}
+          </li>
+        ))}
+      </ol>
+      <Link to="/help" className="mt-3 inline-flex items-center gap-1 text-[13px] font-bold text-accent">
+        Подробная инструкция <ChevronRight size={15} />
+      </Link>
+    </div>
+  );
+}
 
 function PromoBonus() {
   const { data: me } = useMe();
@@ -39,7 +81,15 @@ function useStoreList(data: EventSummary[] | undefined) {
 }
 
 export default function Home() {
-  const [sport, setSport] = useState<SportId | null>(null);
+  // вид спорта хранится в адресе (?sport=football): так его можно выбрать и из левого меню на компьютере
+  const [params, setParams] = useSearchParams();
+  const sport = (params.get('sport') as SportId | null) || null;
+  const setSport = (s: SportId | null) => {
+    const p = new URLSearchParams(params);
+    if (s) p.set('sport', s);
+    else p.delete('sport');
+    setParams(p, { replace: true });
+  };
   const [tab, setTab] = useState<'live' | 'upcoming'>('live');
   const all = useEventList('all');
   const counts = useSportCounts();
@@ -73,6 +123,7 @@ export default function Home() {
       <Header />
       <div className="bg-aurora">
         <PromoBonus />
+        <HowTo />
 
         <SectionTitle className="mt-5" action={<span className="text-[12px] font-bold text-faint">{top.length ? `${top.length} матчей` : ''}</span>}>
           Топ-матчи
@@ -83,7 +134,7 @@ export default function Home() {
             <Skeleton className="h-[218px] w-[84%] shrink-0 rounded-[22px]" />
           </div>
         ) : top.length ? (
-          <div className="no-scrollbar mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 pb-1">
+          <div className="no-scrollbar mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 pb-1 lg:grid lg:grid-cols-2 lg:overflow-visible lg:[&>*:nth-child(n+5)]:hidden">
             {top.map((e, i) => (
               <TopMatchCard key={e.id} id={e.id} index={i} />
             ))}

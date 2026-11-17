@@ -99,7 +99,7 @@ export default function Leaderboard() {
         </>
       )}
       {q.data?.me && (
-        <div className="fixed inset-x-0 bottom-[calc(62px+var(--safe-bottom))] z-30 mx-auto max-w-[480px] px-3 pb-2">
+        <div className="fixed inset-x-0 bottom-[calc(62px+var(--safe-bottom))] z-30 mx-auto max-w-[480px] px-3 pb-2 lg:sticky lg:bottom-4 lg:max-w-none lg:px-4">
           <div className="glass flex items-center gap-3 rounded-2xl border border-accent/30 px-4 py-3 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)]">
             <span className="num font-display text-[15px] font-bold text-accent">#{q.data.me.rank}</span>
             <span className="flex-1 text-[13.5px] font-bold">Ваше место</span>

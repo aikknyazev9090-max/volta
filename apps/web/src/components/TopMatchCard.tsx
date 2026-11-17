@@ -20,7 +20,7 @@ export function TopMatchCard({ id, index }: { id: string; index: number }) {
       initial={{ opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.05, type: 'spring', stiffness: 260, damping: 28 }}
-      className="relative w-[84%] max-w-[340px] shrink-0 snap-center overflow-hidden rounded-[22px] border border-line bg-surface"
+      className="relative w-[84%] max-w-[340px] shrink-0 snap-center lg:w-auto lg:max-w-none overflow-hidden rounded-[22px] border border-line bg-surface"
     >
       {/* цветовое сияние команд */}
       <div className="pointer-events-none absolute -left-10 -top-16 h-44 w-44 rounded-full opacity-30 blur-3xl" style={{ background: c1 }} />

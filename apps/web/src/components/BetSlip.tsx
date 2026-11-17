@@ -56,8 +56,10 @@ function SlipRow({ it, conflict }: { it: SlipItem; conflict: boolean }) {
   );
 }
 
-export function BetSlip() {
-  const { items, mode, stake, open, setOpen, setMode, setStake, clear, applyOdds, acceptAll } = useSlip();
+/** На телефоне купон — выезжающая шторка; на широком экране (docked) — постоянная колонка справа. */
+export function BetSlip({ docked = false }: { docked?: boolean }) {
+  const { items, mode, stake, open: sheetOpen, setOpen, setMode, setStake, clear, applyOdds, acceptAll } = useSlip();
+  const open = docked || sheetOpen;
   const { data: me } = useMe();
   const qc = useQueryClient();
   const fmt = useOddsFormat();
@@ -150,8 +152,8 @@ export function BetSlip() {
     </>
   );
 
-  return (
-    <Sheet open={open} onClose={() => setOpen(false)} maxH="92dvh">
+  const body = (
+    <>
       <div className="flex items-center gap-2 px-5 pb-3 pt-1">
         <h2 className="font-display text-[19px] font-semibold">Купон</h2>
         {items.length > 0 && <span className="num grid h-6 min-w-6 place-items-center rounded-full bg-accent px-1.5 text-[12px] font-extrabold text-accentInk">{items.length}</span>}
@@ -162,8 +164,15 @@ export function BetSlip() {
         )}
       </div>
 
-      {!items.length ? (
-        <EmptyState icon={<Ticket size={32} />} title="Купон пуст" text="Нажмите на любой коэффициент — исход появится здесь. Несколько исходов из разных матчей можно объединить в экспресс." action={<Button variant="secondary" onClick={() => setOpen(false)}>Выбрать матч</Button>} />
+      {!items.length && docked ? (
+        <div className="flex items-start gap-3 px-5 pb-5">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-line bg-surface2 text-accent">
+            <Ticket size={20} />
+          </div>
+          <p className="text-[12.5px] leading-snug text-muted">Купон пуст. Нажмите на вариант в любом матче — он появится здесь, останется ввести сумму и нажать «Поставить».</p>
+        </div>
+      ) : !items.length ? (
+        <EmptyState icon={<Ticket size={32} />} title="Купон пуст" text="Выберите матч и нажмите на исход, например на победу команды. Он появится здесь, останется ввести сумму и нажать «Поставить»." action={docked ? undefined : <Button variant="secondary" onClick={() => setOpen(false)}>Выбрать матч</Button>} />
       ) : (
         <div className="px-4 pb-4">
           {items.length > 1 && (
@@ -294,19 +303,18 @@ export function BetSlip() {
                 place.mutate();
               }}
             >
-              <AnimatePresence mode="wait" initial={false}>
-                {placed ? (
+              {placed ? (
                   <motion.span key="ok" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex items-center gap-2">
                     <Check size={20} strokeWidth={3} /> Принято
                   </motion.span>
                 ) : (
-                  <motion.span key="cta" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-1.5">
                     {cta}
-                  </motion.span>
+                  </span>
                 )}
-              </AnimatePresence>
+              
             </Button>
-            <p className="mt-2.5 text-center text-[11px] text-faint">Демо-режим: ставки на виртуальные монеты · 18+</p>
+            <p className="mt-2.5 text-center text-[11px] text-faint">Демо-режим: ставки на виртуальные монеты</p>
           </div>
         </div>
       )}
@@ -318,6 +326,14 @@ export function BetSlip() {
           </motion.div>
         )}
       </AnimatePresence>
+    </>
+  );
+
+  return docked ? (
+    <aside className="card relative pt-4">{body}</aside>
+  ) : (
+    <Sheet open={sheetOpen} onClose={() => setOpen(false)} maxH="92dvh">
+      {body}
     </Sheet>
   );
 }

@@ -65,6 +65,11 @@ export const MatchCard = memo(function MatchCard({ id, showLeague = false }: { i
         <Row ev={ev} side={0} />
         <Row ev={ev} side={1} />
       </button>
+      {main && !['1x2', 'ml', 'reg1x2'].includes(main.key) && (
+        <div className="mt-2.5 -mb-1 text-[11.5px] font-bold text-muted">
+          Ставка: {main.title}
+        </div>
+      )}
       <div className={clsx('mt-2.5 grid gap-1.5', main?.outcomes.length === 3 ? 'grid-cols-3' : 'grid-cols-2')}>
         {main ? (
           main.outcomes.map((o) => <OddsButton key={o.key} ev={ev} market={main} outcome={o} variant="inline" />)

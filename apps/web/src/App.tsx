@@ -3,7 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { BetSlip } from './components/BetSlip';
-import { BottomNav } from './components/Chrome';
+import { SideRight } from './components/SideRight';
+import { BottomNav, SideNav, useIsDesktop } from './components/Chrome';
 import { Logo } from './components/icons';
 import { BonusSheet, fireConfetti, Onboarding, Toasts } from './components/Overlays';
 import { Button } from './components/ui';
@@ -19,6 +20,7 @@ import Bets from './pages/Bets';
 import Profile from './pages/Profile';
 import Leaderboard from './pages/Leaderboard';
 import Search from './pages/Search';
+import Help from './pages/Help';
 
 const Admin = lazy(() => import('./pages/Admin'));
 
@@ -46,6 +48,11 @@ function useTelegramBackButton() {
       }
     };
   }, [loc.pathname, nav]);
+}
+
+/** Плавное появление страницы на CSS: не зависит от JS-анимаций и всегда заканчивается видимой страницей. */
+function PageFade({ children }: { children: React.ReactNode }) {
+  return <div className="animate-page-in">{children}</div>;
 }
 
 function Splash() {
@@ -84,6 +91,7 @@ export default function App() {
   const loc = useLocation();
   const upsert = useEventsStore((s) => s.upsert);
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  const desktop = useIsDesktop();
   useTelegramBackButton();
 
   useEffect(() => {
@@ -148,26 +156,38 @@ export default function App() {
   const hideNav = loc.pathname.startsWith('/admin') || loc.pathname.startsWith('/search');
 
   return (
-    <div className="relative mx-auto min-h-dvh max-w-[480px] bg-bg" style={{ paddingBottom: hideNav ? undefined : 'calc(76px + var(--safe-bottom))' }}>
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={loc.pathname.split('/')[1] + (loc.pathname.startsWith('/event') ? loc.pathname : '')} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18, ease: 'easeOut' }}>
-          <Suspense fallback={<Splash />}>
-            <Routes location={loc}>
-              <Route path="/" element={<Home />} />
-              <Route path="/live" element={<Live />} />
-              <Route path="/event/:id" element={<EventPage />} />
-              <Route path="/bets" element={<Bets />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/leaderboard" element={<Leaderboard />} />
-              <Route path="/search" element={<Search />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="*" element={<Home />} />
-            </Routes>
-          </Suspense>
-        </motion.div>
-      </AnimatePresence>
-      {!hideNav && <BottomNav />}
-      <BetSlip />
+    <div className="mx-auto min-h-dvh lg:flex lg:max-w-[1400px] lg:gap-6 lg:px-6">
+      {desktop && <SideNav />}
+    <main className="relative mx-auto min-h-dvh w-full max-w-[480px] bg-bg lg:max-w-[780px] lg:flex-1" style={{ paddingBottom: hideNav || desktop ? (desktop ? 24 : undefined) : 'calc(76px + var(--safe-bottom))' }}>
+      {/* Без AnimatePresence mode="wait": если анимация ухода старой страницы не доигрывала
+          (свёрнутое окно, экономия ресурсов в Telegram), новая страница не появлялась — оставался пустой экран. */}
+      <PageFade key={loc.pathname.split('/')[1] + (loc.pathname.startsWith('/event') ? loc.pathname : '')}>
+        <Suspense fallback={<Splash />}>
+          <Routes location={loc}>
+            <Route path="/" element={<Home />} />
+            <Route path="/live" element={<Live />} />
+            <Route path="/event/:id" element={<EventPage />} />
+            <Route path="/bets" element={<Bets />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/help" element={<Help />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="*" element={<Home />} />
+          </Routes>
+        </Suspense>
+      </PageFade>
+    </main>
+      {desktop && (
+        <div className="w-[360px] shrink-0 py-4">
+          <div className="no-scrollbar sticky top-4 max-h-[calc(100dvh-32px)] space-y-3 overflow-y-auto">
+            <BetSlip docked />
+            <SideRight />
+          </div>
+        </div>
+      )}
+      {!hideNav && !desktop && <BottomNav />}
+      {!desktop && <BetSlip />}
       <BonusSheet />
       <Toasts />
       <AnimatePresence>{onboarded === false && <Onboarding onDone={finishOnboarding} />}</AnimatePresence>
