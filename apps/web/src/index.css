@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 7 11 20;
+  --surface: 14 20 33;
+  --surface2: 21 29 46;
+  --surface3: 30 40 62;
+  --ink: 238 242 255;
+  --muted: 133 144 166;
+  --faint: 82 92 114;
+  --accent: 200 255 46;
+  --accent-ink: 10 16 0;
+  --up: 43 229 155;
+  --down: 255 77 106;
+  --live: 255 59 92;
+  --gold: 255 201 60;
+  --line: 255 255 255;
+  --line-a: 0.07;
+  --glass: 10 15 26;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: 242 244 249;
+  --surface: 255 255 255;
+  --surface2: 236 239 246;
+  --surface3: 222 227 238;
+  --ink: 11 16 32;
+  --muted: 96 106 128;
+  --faint: 150 158 176;
+  --accent: 200 255 46;
+  --accent-ink: 10 16 0;
+  --up: 0 168 107;
+  --down: 230 46 77;
+  --live: 235 38 72;
+  --gold: 214 150 0;
+  --line: 11 16 32;
+  --line-a: 0.08;
+  --glass: 255 255 255;
+  color-scheme: light;
+}
+
+html,
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: 'Manrope Variable', Manrope, system-ui, sans-serif;
+  font-feature-settings: 'tnum' 1, 'cv11' 1;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.glass {
+  background: rgb(var(--glass) / 0.72);
+  backdrop-filter: saturate(160%) blur(18px);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+}
+
+.card {
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--line) / var(--line-a));
+  border-radius: 1.125rem;
+}
+
+:root[data-theme='light'] .card {
+  box-shadow: 0 1px 2px rgb(11 16 32 / 0.04), 0 6px 20px -12px rgb(11 16 32 / 0.18);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.bg-aurora {
+  background-image:
+    radial-gradient(60% 40% at 15% 0%, rgb(var(--accent) / 0.10), transparent 70%),
+    radial-gradient(50% 35% at 100% 10%, rgb(90 110 255 / 0.12), transparent 70%);
+}
+
+.ticket-cut {
+  --r: 9px;
+  -webkit-mask:
+    radial-gradient(circle var(--r) at 0 var(--cut, 50%), #0000 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--r) at 100% var(--cut, 50%), #0000 98%, #000) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle var(--r) at 0 var(--cut, 50%), #0000 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--r) at 100% var(--cut, 50%), #0000 98%, #000) right / 51% 100% no-repeat;
+}
+
+.press {
+  transition: transform 0.12s ease;
+}
+.press:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

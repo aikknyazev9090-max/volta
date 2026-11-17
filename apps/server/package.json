@@ -1,0 +1,27 @@
+{
+  "name": "@volta/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
+    "start": "tsx --env-file=../../.env src/index.ts",
+    "test": "vitest run",
+    "start:prod": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.1.0",
+    "@fastify/static": "^8.3.0",
+    "@fastify/websocket": "^11.3.7",
+    "fastify": "^5.12.8",
+    "grammy": "^1.46.0",
+    "https-proxy-agent": "^7.0.6",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.7"
+  }
+}

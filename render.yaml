@@ -1,0 +1,29 @@
+# Render Blueprint: бесплатный веб-сервис.
+services:
+  - type: web
+    name: volta
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: BOT_MODE
+        value: webhook
+      - key: TG_BACKUP
+        value: "true"
+      - key: LIVE_SPEED
+        value: "6"
+      - key: DEV_AUTH
+        value: "false"
+      - key: REAL_MONEY_ENABLED
+        value: "false"
+      - key: NODE_NO_WARNINGS
+        value: "1"
